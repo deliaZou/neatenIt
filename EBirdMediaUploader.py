@@ -2,9 +2,11 @@ import requests
 import os
 import re
 import hashlib
+import time
 import pandas as pd
 import configparser
 from bs4 import BeautifulSoup
+from pandas import notna
 
 
 class EBirdMediaUploader:
@@ -34,7 +36,7 @@ class EBirdMediaUploader:
             df = pd.read_excel(self.library_path, engine='openpyxl', dtype=str)
             # 使用小写拉丁名作为键，实现不区分大小写的匹配
             return {
-                str(cn).strip().lower(): [str(latin).strip(), eng, ebird]
+                str(cn).strip().lower(): [cn, str(latin).strip(), eng, ebird]
                 for latin, cn, eng, ebird in zip(df['拉丁名'], df['中文名'],df['英文名'],df['ebird'],) if pd.notna(latin)
             }
         except Exception as e:
@@ -132,13 +134,15 @@ class EBirdMediaUploader:
             match = re.match(r"^(.+?)_Y.*?\.(jpg|jpeg|JPG|JPEG)$", file_name)
             if match:
                 bird_name = match.group(1)
-                # 如果找不到映射，则 fallback 使用原名species_dict: 中文名：[拉丁名，英文名，ebird名]
-                ebird_target_name = self.species_dict.get(bird_name, bird_name)[-1]
+                # 如果找不到映射，则 fallback 使用原名species_dict: [中文名，拉丁名，英文名，ebird名]
+                target_name = self.species_dict.get(bird_name, bird_name)
+                ebird_target_name = target_name[-1] if pd.notna(target_name[-1]) else target_name[0]  # 如有指定的ebird值 如虎斑地鸫 (怀氏虎鸫)，用指定值，否则用现有中文
+                info = bird_map[ebird_target_name]
 
-                if ebird_target_name in bird_map:
+                if ebird_target_name in bird_map:  # 查到有数据
                     print(f"[*] 处理: {file_name}")
                     f_path = os.path.join(folder_path, file_name)
-                    info = bird_map[ebird_target_name]
+
                     if self.upload_media(checklist_id, f_path, info['obsId'], info['speciesCode'], csrf_token):
                         print(f"[+] 成功: {ebird_target_name}")
                     else:
@@ -149,4 +153,4 @@ class EBirdMediaUploader:
 if __name__ == "__main__":
     uploader = EBirdMediaUploader("secrets.ini", "bird_species_library.xlsx")
     if uploader.login():
-        uploader.run_folder_upload("S301643779", "D:\\birds\\20260217 虞山国家森林公园")
+        uploader.run_folder_upload("S301899422", "D:\\birds\\20260218 虞山国家森林公园")

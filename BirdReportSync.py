@@ -196,6 +196,7 @@ class BirdReportSync:
                 records = [{"activity_id": act_id, "taxon_id": item['taxon_id'], "taxon_count": item['taxon_count'],
                             "member_id": self.member_id, "uuid": item['uuid']} for item in up_data]
 
+                # 推送记录并截获返回的详情详情 ID
                 self.session.post("https://api.birdreport.cn/member/system/upload/pushTaxon",
                                   json={"point": {"point_id": point_info["point_id"]}, "activity": {"id": str(act_id)},
                                         "records": records}, headers=headers)
@@ -213,4 +214,4 @@ class BirdReportSync:
 # ================= 运行 =================
 if __name__ == "__main__":
     syncer = BirdReportSync("secrets.ini", "bird_species_library.xlsx")
-    syncer.sync_to_birdreport("S301238171", 491)
+    syncer.sync_to_birdreport("S301899422", 200828)
