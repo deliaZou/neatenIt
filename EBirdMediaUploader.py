@@ -7,6 +7,9 @@ import pandas as pd
 import configparser
 from bs4 import BeautifulSoup
 from pandas import notna
+import requests
+from urllib3.util import Retry
+from requests.adapters import HTTPAdapter
 
 
 class EBirdMediaUploader:
@@ -33,7 +36,7 @@ class EBirdMediaUploader:
             print(f"[-] 警告: 库文件 {self.library_path} 不存在")
             return {}
         try:
-            df = pd.read_excel(self.library_path, engine='openpyxl', dtype=str)
+            df = pd.read_csv(self.library_path, dtype=str)
             # 使用小写拉丁名作为键，实现不区分大小写的匹配
             return {
                 str(cn).strip().lower(): [cn, str(latin).strip(), eng, ebird]
@@ -111,11 +114,26 @@ class EBirdMediaUploader:
                                   params={"fileName": file_name, "md5sum": md5_val, "contentType": "image/jpeg"})
         if resp_p.status_code != 200: return False
         p_data = resp_p.json()
-
+        time.sleep(5)
         # B. 上传至 S3 存储桶
+        session = requests.Session()
+        # 定义重试策略：针对连接错误和特定状态码重试 3 次
+        retries = Retry(total=3, backoff_factor=1, status_forcelist=[502, 503, 504])
+        session.mount('https://', HTTPAdapter(max_retries=retries))
+
         with open(file_path, 'rb') as f:
-            # S3 上传不带 Session Headers
-            requests.post(p_data['uploadUrl'], data=p_data['policy'], files={'file': f})
+            try:
+                # 加上 timeout 防止死等
+                # 有时显式关闭 keep-alive 也能解决 10054
+                headers = {"Connection": "close"}
+                r = session.post(p_data['uploadUrl'], data=p_data['policy'], files={'file': f}, timeout=30, headers=headers)
+                r.raise_for_status()
+            except requests.exceptions.ConnectionError as e:
+                print(f"上传失败，触发 10054 错误: {e}")
+                return False
+        # with open(file_path, 'rb') as f:
+        #     # S3 上传不带 Session Headers
+        #     requests.post(p_data['uploadUrl'], data=p_data['policy'], files={'file': f})
 
         # C. 媒体与记录关联
         add_url = f"https://ebird.org/media-assets/add/{checklist_id}"
@@ -131,26 +149,34 @@ class EBirdMediaUploader:
 
         for file_name in os.listdir(folder_path):
             # 匹配 "鸟名_Y.jpg" 格式
-            match = re.match(r"^(.+?)_Y.*?\.(jpg|jpeg|JPG|JPEG)$", file_name)
+            match = re.match(r"^(.+?)_Y(?!Y).*?\.(jpg|jpeg|JPG|JPEG)$", file_name)
             if match:
                 bird_name = match.group(1)
                 # 如果找不到映射，则 fallback 使用原名species_dict: [中文名，拉丁名，英文名，ebird名]
                 target_name = self.species_dict.get(bird_name, bird_name)
                 ebird_target_name = target_name[-1] if pd.notna(target_name[-1]) else target_name[0]  # 如有指定的ebird值 如虎斑地鸫 (怀氏虎鸫)，用指定值，否则用现有中文
-                info = bird_map[ebird_target_name]
-
                 if ebird_target_name in bird_map:  # 查到有数据
-                    print(f"[*] 处理: {file_name}")
-                    f_path = os.path.join(folder_path, file_name)
+                    info = bird_map[ebird_target_name]
+                elif target_name[-2] in bird_map:  # 英文名
+                    info = bird_map[target_name[-2]]
+                else:
+                    print(f"[+] 没找到这个鸟: {target_name}")
+                    continue
 
-                    if self.upload_media(checklist_id, f_path, info['obsId'], info['speciesCode'], csrf_token):
-                        print(f"[+] 成功: {ebird_target_name}")
-                    else:
-                        print(f"[-] 失败: {ebird_target_name}")
+                print(f"[*] 处理: {file_name}")
+                f_path = os.path.join(folder_path, file_name)
+
+                if self.upload_media(checklist_id, f_path, info['obsId'], info['speciesCode'], csrf_token):
+                    print(f"[+] 成功: {ebird_target_name}")
+                    new_path = f_path.replace("_Y", "_YY")
+                    os.rename(f_path, new_path)
+                    print(f"文件名已更新为: {new_path}")
+                else:
+                    print(f"[-] 失败: {ebird_target_name}")
 
 
 # ================= 运行 =================
 if __name__ == "__main__":
-    uploader = EBirdMediaUploader("secrets.ini", "bird_species_library.xlsx")
+    uploader = EBirdMediaUploader("secrets.ini", "final_merged_birds.csv")
     if uploader.login():
-        uploader.run_folder_upload("S301899422", "D:\\birds\\20260218 虞山国家森林公园")
+        uploader.run_folder_upload("S297412476", "D:\\birds\\20260201 FRIM--Taman Botani Kepong")

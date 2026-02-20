@@ -214,4 +214,4 @@ class BirdReportSync:
 # ================= 运行 =================
 if __name__ == "__main__":
     syncer = BirdReportSync("secrets.ini", "bird_species_library.xlsx")
-    syncer.sync_to_birdreport("S301899422", 200828)
+    syncer.sync_to_birdreport("S302117843", 200828)
