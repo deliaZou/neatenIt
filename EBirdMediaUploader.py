@@ -11,16 +11,20 @@ import requests
 from urllib3.util import Retry
 from requests.adapters import HTTPAdapter
 
+from EBirdSessionManager import EBirdSessionManager
 
-class EBirdMediaUploader:
-    def __init__(self, config_path, library_path):
-        self.username, self.password = self._load_secrets(config_path)
+
+class EBirdMediaUploader(EBirdSessionManager):
+
+    def __init__(self, library_path):
         self.library_path = library_path
         self.session = requests.Session()
         self.session.headers.update({
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
         })
         self.species_dict = self._load_species_library()
+        super().__init__()
+        self.get_valid_session()
 
     def _load_secrets(self, path):
         """从 .ini 文件读取用户名和密码"""
@@ -45,33 +49,6 @@ class EBirdMediaUploader:
         except Exception as e:
             print(f"[-] 库文件加载失败: {e}")
             return {}
-
-    def login(self):
-        """1. 登录流程：获取 CAS 验证并保持 Session"""
-        print("[*] 正在尝试登录 eBird...")
-        login_url = "https://secure.birds.cornell.edu/cassso/login?service=https%3A%2F%2Febird.org%2Flogin%2Fcas%3Fportal%3Debird&locale=zh-cn"
-        try:
-            resp = self.session.get(login_url)
-            soup = BeautifulSoup(resp.text, 'html.parser')
-            execution = soup.find('input', {'name': 'execution'})['value']
-
-            payload = {
-                'service': 'https://ebird.org/login/cas?portal=ebird',
-                'locale': 'zh-cn',
-                'username': self.username,
-                'password': self.password,
-                'rememberMe': 'on',
-                'execution': execution,
-                '_eventId': 'submit'
-            }
-
-            res = self.session.post("https://secure.birds.cornell.edu/cassso/login", data=payload)
-            if "Sign Out" in res.text or "退出" in res.text:
-                print("[+] 登录成功！")
-                return True
-        except Exception as e:
-            print(f"[-] 登录异常: {e}")
-        return False
 
     def get_checklist_info(self, checklist_id):
         """2. 解析流程：获取清单中的 obsId, speciesCode 和 CSRF Token"""
@@ -177,6 +154,6 @@ class EBirdMediaUploader:
 
 # ================= 运行 =================
 if __name__ == "__main__":
-    uploader = EBirdMediaUploader("secrets.ini", "final_merged_birds.csv")
+    uploader = EBirdMediaUploader("final_merged_birds.csv")
     if uploader.login():
-        uploader.run_folder_upload("S297412476", "D:\\birds\\20260201 FRIM--Taman Botani Kepong")
+        uploader.run_folder_upload("S302117843", "D:\\birds\\20260219 虞山森林公园")

@@ -9,16 +9,16 @@ import configparser
 from datetime import datetime, timedelta
 from bs4 import BeautifulSoup
 
+from EBirdSessionManager import EBirdSessionManager
 
-class BirdReportSync:
+
+class BirdReportSync(EBirdSessionManager):
     def __init__(self, config_path, library_path):
         """初始化配置并加载凭据"""
         self.config = configparser.ConfigParser()
         self.config.read(config_path, encoding='utf-8')
 
         # 读取凭据
-        self.ebird_user = self.config.get('ebird', 'username')
-        self.ebird_pass = self.config.get('ebird', 'password')
         self.br_token = self.config.get('birdreport', 'token')
         self.member_id = self.config.getint('birdreport', 'member_id')
 
@@ -28,6 +28,8 @@ class BirdReportSync:
             "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/144.0.0.0 Safari/537.36"
         })
         self.species_df = self._load_species_library()
+        super().__init__()
+        self.get_valid_session()
 
     def _load_species_library(self):
         """预加载鸟种库，解决拉丁名匹配问题"""
@@ -41,34 +43,6 @@ class BirdReportSync:
         except Exception as e:
             print(f"[-] 库文件加载失败: {e}")
             return {}
-
-    def login_ebird(self):
-        """执行 eBird CAS 自动登录，获取动态 Session"""
-        print("[*] 正在尝试登录 eBird...")
-        login_url = "https://secure.birds.cornell.edu/cassso/login?service=https%3A%2F%2Febird.org%2Flogin%2Fcas%3Fportal%3Debird&locale=zh-cn"
-        try:
-            # 1. 获取 execution 参数
-            resp = self.session.get(login_url)
-            soup = BeautifulSoup(resp.text, 'html.parser')
-            execution = soup.find('input', {'name': 'execution'})['value']
-
-            # 2. 提交登录
-            payload = {
-                'service': 'https://ebird.org/login/cas?portal=ebird',
-                'username': self.ebird_user,
-                'password': self.ebird_pass,
-                'execution': execution,
-                '_eventId': 'submit',
-                'rememberMe': 'on'
-            }
-            res = self.session.post("https://secure.birds.cornell.edu/cassso/login", data=payload)
-
-            if "Sign Out" in res.text or "退出" in res.text:
-                print("[+] eBird 登录成功！")
-                return True
-        except Exception as e:
-            print(f"[-] eBird 登录异常: {e}")
-        return False
 
     def _get_final_cn_name(self, full_name_str):
         """解析拉丁名并查表映射中文名"""
@@ -141,12 +115,11 @@ class BirdReportSync:
 
     def sync_to_birdreport(self, ebird_subid, target_point_id):
         """同步主流程"""
-        if not self.login_ebird(): return
 
         # 1. 获取点位信息 (假设已存在 chinese_points.csv)
         point_info = None
-        if os.path.exists('chinese_points.csv'):
-            with open('chinese_points.csv', mode='r', encoding='utf-8') as f:
+        if os.path.exists('resource/chinese_points.csv'):
+            with open('resource/chinese_points.csv', mode='r', encoding='utf-8') as f:
                 reader = csv.DictReader(f)
                 for row in reader:
                     if row['point_id'] == str(target_point_id):
@@ -213,5 +186,5 @@ class BirdReportSync:
 
 # ================= 运行 =================
 if __name__ == "__main__":
-    syncer = BirdReportSync("secrets.ini", "bird_species_library.xlsx")
+    syncer = BirdReportSync("secrets.ini", "resource/bird_species_library.xlsx")
     syncer.sync_to_birdreport("S302117843", 200828)
