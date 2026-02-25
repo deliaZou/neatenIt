@@ -154,6 +154,5 @@ class EBirdMediaUploader(EBirdSessionManager):
 
 # ================= 运行 =================
 if __name__ == "__main__":
-    uploader = EBirdMediaUploader("final_merged_birds.csv")
-    if uploader.login():
-        uploader.run_folder_upload("S302117843", "D:\\birds\\20260219 虞山森林公园")
+    uploader = EBirdMediaUploader("resource/final_merged_birds.csv")
+    uploader.run_folder_upload("S302117843", "D:\\birds\\20260219 虞山森林公园")

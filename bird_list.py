@@ -15,7 +15,7 @@ def get_avibase_malaysia_data(url):
     rows = soup.select("tr")
 
     for row in rows:
-        header_text = row.get_text(strip=True)
+        header_text = row.get_text(strip=Tue)
         if ":" in header_text and ("IDAE" in header_text.upper() or "IFORMES" in header_text.upper()):
             parts = header_text.split(":")
             current_order, current_family = parts[0].strip(), parts[1].strip()
