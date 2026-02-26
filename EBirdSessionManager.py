@@ -36,13 +36,28 @@ class EBirdSessionManager:
 
     def _save_cookies_to_cache(self):
         """将当前 Session 里的有效 Cookie 保存到 auth.ini"""
+        """读取原有 secrets.ini，仅更新或添加 [ebird] 节下的 cookie_string，不覆盖其他内容"""
         config = configparser.ConfigParser()
+
+        # 1. 首先读取现有文件内容（如果文件不存在，read 不会报错，会得到一个空的 config）
+        if os.path.exists(self.secrets_path):
+            config.read(self.secrets_path, encoding='utf-8')
+
+        # 2. 准备最新的 Cookie 字符串
         cookie_dict = self.session.cookies.get_dict()
         cookie_str = "; ".join([f"{k}={v}" for k, v in cookie_dict.items()])
 
-        config['ebird'] = {'cookie_string': cookie_str}
+        # 3. 检查 [ebird] 节是否存在，不存在则创建
+        if 'ebird' not in config:
+            config.add_section('ebird')
+
+        # 4. 仅设置或更新 cookie_string，原有的 username, password 会被保留
+        config.set('ebird', 'cookie_string', cookie_str)
+
+        # 5. 写回文件
         with open(self.secrets_path, 'w', encoding='utf-8') as f:
             config.write(f)
+        print("[+] Cookie 已成功更新至配置文件，原账号信息已保留。")
 
     def login_cas(self):
         """基础登录流程：获取 CAS 验证"""

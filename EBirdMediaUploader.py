@@ -26,14 +26,6 @@ class EBirdMediaUploader(EBirdSessionManager):
         super().__init__()
         self.get_valid_session()
 
-    def _load_secrets(self, path):
-        """从 .ini 文件读取用户名和密码"""
-        if not os.path.exists(path):
-            raise FileNotFoundError(f"找不到配置文件: {path}，请确保它不在 git 追踪范围内")
-        config = configparser.ConfigParser()
-        config.read(path, encoding='utf-8')
-        return config.get('ebird', 'username'), config.get('ebird', 'password')
-
     def _load_species_library(self):
         """预加载鸟种库，解决拉丁名匹配问题"""
         if not os.path.exists(self.library_path):
@@ -131,11 +123,16 @@ class EBirdMediaUploader(EBirdSessionManager):
                 bird_name = match.group(1)
                 # 如果找不到映射，则 fallback 使用原名species_dict: [中文名，拉丁名，英文名，ebird名]
                 target_name = self.species_dict.get(bird_name, bird_name)
-                ebird_target_name = target_name[-1] if pd.notna(target_name[-1]) else target_name[0]  # 如有指定的ebird值 如虎斑地鸫 (怀氏虎鸫)，用指定值，否则用现有中文
-                if ebird_target_name in bird_map:  # 查到有数据
-                    info = bird_map[ebird_target_name]
-                elif target_name[-2] in bird_map:  # 英文名
-                    info = bird_map[target_name[-2]]
+                if type(target_name) is list:
+                    ebird_target_name = target_name[-1] if pd.notna(target_name[-1]) else target_name[0]  # 如有指定的ebird值 如虎斑地鸫 (怀氏虎鸫)，用指定值，否则用现有中文
+                    if ebird_target_name in bird_map:  # 查到有数据
+                        info = bird_map[ebird_target_name]
+                    elif target_name[-2] in bird_map:  # 英文名
+                        info = bird_map[target_name[-2]]
+                elif type(target_name) is str:
+                    ebird_target_name = bird_name
+                    if ebird_target_name in bird_map:  # 查到有数据
+                        info = bird_map[ebird_target_name]
                 else:
                     print(f"[+] 没找到这个鸟: {target_name}")
                     continue
