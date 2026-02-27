@@ -2,4 +2,5 @@ secrets.ini
 .idea
 resource/birding_notes.md
 resource/观鸟记录表.csv
+resource/bird_notes_theme.md
 auth.ini

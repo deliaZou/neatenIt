@@ -5,7 +5,7 @@ from BirdReportSync import BirdReportSync
 if __name__ == "__main__":
     # 上传照片
     uploader = EBirdMediaUploader("resource/final_merged_birds.csv")
-    uploader.run_folder_upload("S293394865", "D:\\照片\\birds\\20260110 Taman Rimba Kiara")
+    uploader.run_folder_upload("S290718690", "D:\\照片\\birds\\20251228 Perdana Botanical Garden-")
 
     # --- 更新鸟单 ---
     # manager = EBirdChecklistManager("resource/观鸟记录表.csv", "resource/birding_notes.md")
